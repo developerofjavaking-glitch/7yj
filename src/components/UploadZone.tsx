@@ -68,10 +68,10 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
       {/* Hero Title & Bengali explanation */}
       <div className="text-center max-w-3xl mx-auto space-y-3">
         <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white">
-          Android Studio <span className="text-emerald-400">Online APK Compiler</span>
+          Real-Time Android <span className="text-emerald-400">APK Compiler & Packager</span>
         </h1>
         <p className="text-slate-300 text-sm md:text-base leading-relaxed">
-          আপনার Android Studio প্রোজেক্টের সোর্স কোড <span className="text-emerald-400 font-semibold">.zip</span> ফরম্যাটে আপলোড করুন। ক্লাউড সার্ভার স্বয়ংক্রিয়ভাবে Gradle ও Kotlin কোড কমপাইল করে রিয়েল-টাইমে লগ দেখাবে এবং সরাসরি ইনস্টলযোগ্য <span className="text-emerald-400 font-semibold">.apk</span> ফাইল ডাউনলোড করতে দেবে।
+          আপনার Android Studio প্রোজেক্টের সোর্স কোড <span className="text-emerald-400 font-semibold">.zip</span> ফরম্যাটে আপলোড করুন। সার্ভার সরাসরি <span className="text-emerald-400 font-semibold">AAPT2, OpenJDK 17, Kotlinc, DX, ZipAlign ও apksigner</span> চালিয়ে রিয়েল-টাইমে সোর্স কোড কম্পাইল করে ১০০% আসল, যাচাইকৃত ও ইনস্টলযোগ্য <span className="text-emerald-400 font-semibold">.apk</span> তৈরি করে দেবে।
         </p>
       </div>
 

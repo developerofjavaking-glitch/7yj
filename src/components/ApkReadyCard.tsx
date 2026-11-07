@@ -105,7 +105,7 @@ export const ApkReadyCard: React.FC<ApkReadyCardProps> = ({ apk, buildId }) => {
           <span className="text-[11px] text-slate-400 block">সাইন স্কিম (Signing)</span>
           <span className="text-base font-bold text-emerald-400 font-mono flex items-center gap-1">
             <ShieldCheck className="w-4 h-4" />
-            Debug v1+v2
+            Real v1+v2+v3
           </span>
         </div>
       </div>

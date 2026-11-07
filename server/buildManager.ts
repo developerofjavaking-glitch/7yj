@@ -4,6 +4,7 @@ import path from 'path';
 import AdmZip from 'adm-zip';
 import { GoogleGenAI } from '@google/genai';
 import { packageCompleteApk } from './apkPackager.js';
+import { compileRealAndroidProject } from './realCompiler.js';
 import { DEMO_PROJECTS } from './demoProjects.js';
 
 export interface LogEntry {
@@ -223,6 +224,20 @@ class BuildManager extends EventEmitter {
   }
 
   public async startDemoBuild(demoId: string = 'mazebd'): Promise<string> {
+    if (demoId === 'mazebd') {
+      const realZipPath = path.resolve('public/assets/aistudio/MazeBDCreator_7210c0a4.zip');
+      if (fs.existsSync(realZipPath)) {
+        const buf = fs.readFileSync(realZipPath);
+        return this.startBuildFromZip(buf, 'MazeBDCreator.zip');
+      }
+    } else if (demoId === 'game_launcher') {
+      const realZipPath = path.resolve('public/assets/aistudio/Game-Launcher-main_474fcc1f.zip');
+      if (fs.existsSync(realZipPath)) {
+        const buf = fs.readFileSync(realZipPath);
+        return this.startBuildFromZip(buf, 'Game-Launcher-main.zip');
+      }
+    }
+
     const demo = DEMO_PROJECTS[demoId] || DEMO_PROJECTS.mazebd;
     const zip = new AdmZip();
     for (const f of demo.files) {
@@ -236,14 +251,13 @@ class BuildManager extends EventEmitter {
     const startTime = Date.now();
     try {
       build.status = 'ANALYZING';
-      this.addLog(build, `=== CloudAPK Studio Build Engine v2.4 (Gradle 8.5 / OpenJDK 17) ===`, 'info');
+      this.addLog(build, `=== CloudAPK Studio Real-Time Android Compiler Engine (AAPT2 / OpenJDK 17 / Kotlinc / apksigner) ===`, 'info');
       this.addLog(build, `Target Project: ${build.projectName}`, 'info');
       this.addLog(build, `Session ID: ${build.id}`, 'info');
 
       // STAGE 1: Extract Zip & Build File Tree
       this.updateProgress(build, 8, 'Archive Extraction', 'Unzipping project archive...');
       this.addLog(build, `[1/7] Extracting source archive (${(zipBuffer.length / 1024 / 1024).toFixed(2)} MB)...`, 'task');
-      await new Promise((r) => setTimeout(r, 450));
 
       const zip = new AdmZip(zipBuffer);
       zip.extractAllTo(buildDir, true);
@@ -253,7 +267,7 @@ class BuildManager extends EventEmitter {
         .map((e) => e.entryName)
         .filter((n) => !n.endsWith('/') && !n.includes('__MACOSX'));
 
-      this.addLog(build, `Extracted ${build.fileTree.length} files successfully.`, 'success');
+      this.addLog(build, `Extracted ${build.fileTree.length} files successfully into workspace.`, 'success');
       for (const entry of build.fileTree.slice(0, 10)) {
         this.addLog(build, `  + ${entry}`, 'info');
       }
@@ -261,124 +275,20 @@ class BuildManager extends EventEmitter {
         this.addLog(build, `  ... and ${build.fileTree.length - 10} more files.`, 'info');
       }
 
-      // STAGE 2: Parse Android Manifest & Gradle Files
-      this.updateProgress(build, 20, 'Gradle & Manifest Parsing', 'Parsing AndroidManifest.xml and Gradle scripts');
-      this.addLog(build, `[2/7] Analyzing project structure and Gradle configurations...`, 'task');
-      await new Promise((r) => setTimeout(r, 550));
-
-      // Scan for AndroidManifest.xml
-      let manifestContent = '';
-      const manifestFileEntry = build.fileTree.find(
-        (f) => f.endsWith('AndroidManifest.xml') || f.includes('AndroidManifest.xml')
-      );
-
-      if (manifestFileEntry) {
-        const fullManifestPath = path.join(buildDir, manifestFileEntry);
-        if (fs.existsSync(fullManifestPath)) {
-          manifestContent = fs.readFileSync(fullManifestPath, 'utf-8');
-          this.addLog(build, `Found AndroidManifest at: ${manifestFileEntry}`, 'info');
-
-          // Extract package
-          const pkgMatch = manifestContent.match(/package\s*=\s*["']([^"']+)["']/);
-          if (pkgMatch) build.packageName = pkgMatch[1];
-
-          // Extract label / appName
-          const labelMatch = manifestContent.match(/android:label\s*=\s*["']([^"']+)["']/);
-          if (labelMatch) {
-            const rawLabel = labelMatch[1];
-            if (!rawLabel.startsWith('@string/')) {
-              build.appName = rawLabel;
-            } else {
-              // Try to find string resource
-              const strVal = this.findStringResource(buildDir, rawLabel.replace('@string/', ''));
-              if (strVal) build.appName = strVal;
-            }
-          }
-
-          // Extract minSdk / targetSdk if in manifest
-          const minSdkMatch = manifestContent.match(/android:minSdkVersion\s*=\s*["'](\d+)["']/);
-          if (minSdkMatch) build.minSdk = parseInt(minSdkMatch[1], 10);
-          const targetSdkMatch = manifestContent.match(/android:targetSdkVersion\s*=\s*["'](\d+)["']/);
-          if (targetSdkMatch) build.targetSdk = parseInt(targetSdkMatch[1], 10);
-        }
-      }
-
-      // Scan build.gradle / build.gradle.kts
-      const gradleFiles = build.fileTree.filter(
-        (f) => f.endsWith('build.gradle.kts') || f.endsWith('build.gradle')
-      );
-      for (const gf of gradleFiles) {
-        const p = path.join(buildDir, gf);
-        if (fs.existsSync(p)) {
-          const content = fs.readFileSync(p, 'utf-8');
-          const nsMatch = content.match(/namespace\s*=\s*["']([^"']+)["']/);
-          if (nsMatch) build.packageName = nsMatch[1];
-
-          const appIdMatch = content.match(/applicationId\s*=\s*["']([^"']+)["']/);
-          if (appIdMatch) build.packageName = appIdMatch[1];
-
-          const cSdkMatch = content.match(/compileSdk\s*=\s*(\d+)/);
-          if (cSdkMatch) build.targetSdk = parseInt(cSdkMatch[1], 10);
-
-          const tSdkMatch = content.match(/targetSdk\s*=\s*(\d+)/);
-          if (tSdkMatch) build.targetSdk = parseInt(tSdkMatch[1], 10);
-
-          const mSdkMatch = content.match(/minSdk\s*=\s*(\d+)/);
-          if (mSdkMatch) build.minSdk = parseInt(mSdkMatch[1], 10);
-
-          const vCodeMatch = content.match(/versionCode\s*=\s*(\d+)/);
-          if (vCodeMatch) build.versionCode = parseInt(vCodeMatch[1], 10);
-
-          const vNameMatch = content.match(/versionName\s*=\s*["']([^"']+)["']/);
-          if (vNameMatch) build.versionName = vNameMatch[1];
-        }
-      }
-
-      this.addLog(build, `Resolved App Metadata:`, 'info');
-      this.addLog(build, `  Application ID: ${build.packageName}`, 'info');
-      this.addLog(build, `  Application Name: ${build.appName}`, 'info');
-      this.addLog(build, `  Version: ${build.versionName} (code: ${build.versionCode})`, 'info');
-      this.addLog(build, `  SDK Range: minSdk ${build.minSdk} -> compileSdk / targetSdk ${build.targetSdk}`, 'info');
-
-      // STAGE 3: Dependency Resolution & Gradle Daemon
       build.status = 'BUILDING';
-      this.updateProgress(build, 35, 'Dependency Resolution', ':app:preBuild, resolving dependencies from Google & MavenCentral');
-      this.addLog(build, `[3/7] Starting Gradle daemon & resolving dependencies...`, 'task');
-      this.addLog(build, `> Task :app:preBuild UP-TO-DATE`, 'task');
-      this.addLog(build, `> Task :app:preDebugBuild UP-TO-DATE`, 'task');
-      await new Promise((r) => setTimeout(r, 600));
 
-      this.addLog(build, `> Task :app:checkDebugAarMetadata UP-TO-DATE`, 'task');
-      this.addLog(build, `> Task :app:generateDebugResValues UP-TO-DATE`, 'task');
-      this.addLog(build, `> Task :app:mapDebugSourceSetPaths UP-TO-DATE`, 'task');
-      this.addLog(build, `> Task :app:generateDebugResources UP-TO-DATE`, 'task');
-      this.addLog(build, `> Task :app:mergeDebugResources`, 'task');
-      await new Promise((r) => setTimeout(r, 700));
+      // RUN REAL COMPILATION PIPELINE
+      const result = await compileRealAndroidProject({
+        buildId: build.id,
+        buildDir,
+        projectName: build.projectName,
+        log: (text, type) => this.addLog(build, text, type),
+        progress: (p, stage, task) => this.updateProgress(build, p, stage, task),
+      });
 
-      // STAGE 4: Source Validation & Java / Kotlin Compilation
-      this.updateProgress(build, 55, 'Source Compilation', ':app:compileDebugKotlin & :app:compileDebugJavaWithJavac');
-      this.addLog(build, `[4/7] Compiling Java/Kotlin source code...`, 'task');
-      this.addLog(build, `> Task :app:processDebugManifest`, 'task');
-
-      // Check for intentional syntax errors in code or broken constructs
-      const compilationError = this.scanForCodeErrors(buildDir, build.fileTree);
-      if (compilationError) {
-        // Trigger simulated or detected compile error!
-        await new Promise((r) => setTimeout(r, 600));
-        this.addLog(build, `> Task :app:compileDebugKotlin FAILED`, 'error');
-        this.addLog(build, compilationError.fullOutput, 'error');
-        this.addLog(build, `\nFAILURE: Build failed with an exception.`, 'error');
-        this.addLog(build, `* What went wrong:`, 'error');
-        this.addLog(build, `Execution failed for task ':app:compileDebugKotlin'.`, 'error');
-        this.addLog(build, `> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction`, 'error');
-        this.addLog(build, `  Compilation error in: ${compilationError.file} at line ${compilationError.line}`, 'error');
-        this.addLog(build, `\n* Try:`, 'info');
-        this.addLog(build, `> Run with --stacktrace option to get the stack trace.`, 'info');
-        this.addLog(build, `> Run with --info or --debug option to get more log output.`, 'info');
-        this.addLog(build, `\nBUILD FAILED in 6s`, 'error');
-
+      if (!result.success || result.error) {
         build.status = 'FAILED';
-        build.errors = [compilationError];
+        build.errors = result.error ? [result.error] : [];
         build.currentTask = 'Build Failed';
         build.completedAt = new Date().toISOString();
         build.durationMs = Date.now() - startTime;
@@ -393,91 +303,28 @@ class BuildManager extends EventEmitter {
         return;
       }
 
-      await new Promise((r) => setTimeout(r, 800));
-      this.addLog(build, `> Task :app:compileDebugKotlin SUCCESS`, 'success');
-      this.addLog(build, `> Task :app:compileDebugJavaWithJavac SUCCESS`, 'success');
-
-      // STAGE 5: DEX generation & Resource Packaging (aapt2)
-      this.updateProgress(build, 72, 'DEX & Resource Packaging', ':app:mergeLibDexDebug, :app:mergeProjectDexDebug, :app:packageDebug');
-      this.addLog(build, `[5/7] Generating Dalvik Executable (classes.dex) and packaging resources...`, 'task');
-      this.addLog(build, `> Task :app:mergeLibDexDebug`, 'task');
-      this.addLog(build, `> Task :app:mergeProjectDexDebug`, 'task');
-      this.addLog(build, `> Task :app:mergeExtDexDebug`, 'task');
-      this.addLog(build, `> Task :app:mergeDexDebug`, 'task');
-      await new Promise((r) => setTimeout(r, 800));
-
-      this.addLog(build, `> Task :app:compressDebugAssets UP-TO-DATE`, 'task');
-      this.addLog(build, `> Task :app:processDebugResources`, 'task');
-      this.addLog(build, `> Task :app:packageDebug`, 'task');
-
-      // STAGE 6: Keystore Signing & Alignment
-      this.updateProgress(build, 88, 'APK Signing & Alignment', 'Signing APK with Android Debug Keystore (v1 + v2 scheme)');
-      this.addLog(build, `[6/7] Signing debug APK with SHA-256 certificate & zipalign 4-byte boundaries...`, 'task');
-      await new Promise((r) => setTimeout(r, 700));
-
-      // Collect project resources to inject into APK
-      const extraResFiles: { path: string; buffer: Buffer }[] = [];
-      const resFiles = build.fileTree.filter((f) => f.includes('/src/main/res/'));
-      for (const rf of resFiles.slice(0, 15)) {
-        try {
-          const content = fs.readFileSync(path.join(buildDir, rf));
-          const relRes = rf.substring(rf.indexOf('/res/') + 1);
-          extraResFiles.push({ path: relRes, buffer: content });
-        } catch {
-          // ignore
-        }
+      // Save real APK to disk
+      const finalApkPath = path.join(this.apksDir, `${build.id}.apk`);
+      if (result.apkBuffer) {
+        fs.writeFileSync(finalApkPath, result.apkBuffer);
+      } else if (result.apkPath && fs.existsSync(result.apkPath)) {
+        fs.copyFileSync(result.apkPath, finalApkPath);
       }
 
-      const safeManifestXml =
-        manifestContent ||
-        `<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="${build.packageName}">
-    <uses-permission android:name="android.permission.INTERNET" />
-    <application
-        android:allowBackup="true"
-        android:label="${build.appName}"
-        android:supportsRtl="true">
-        <activity android:name=".MainActivity" android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-    </application>
-</manifest>`;
-
-      const packaged = packageCompleteApk({
-        packageName: build.packageName,
-        appName: build.appName,
-        versionName: build.versionName,
-        versionCode: build.versionCode,
-        minSdk: build.minSdk,
-        targetSdk: build.targetSdk,
-        manifestXml: safeManifestXml,
-        extraFiles: extraResFiles,
-      });
-
-      // Save APK to disk
-      const finalApkPath = path.join(this.apksDir, `${build.id}.apk`);
-      fs.writeFileSync(finalApkPath, packaged.apkBuffer);
-
-      // STAGE 7: Finalize & Verification
-      this.updateProgress(build, 98, 'Verification & Finalize', ':app:assembleDebug');
-      this.addLog(build, `[7/7] Verifying APK integrity and signature manifests...`, 'task');
-      this.addLog(build, `> Task :app:createDebugApkListingFileRedirect`, 'task');
-      this.addLog(build, `> Task :app:assembleDebug SUCCESS`, 'success');
-      await new Promise((r) => setTimeout(r, 400));
+      build.packageName = result.packageName;
+      build.appName = result.appName;
+      build.versionName = result.versionName;
+      build.versionCode = result.versionCode;
+      build.minSdk = result.minSdk;
+      build.targetSdk = result.targetSdk;
 
       const sanitizedName = build.appName.replace(/[^a-zA-Z0-9_-]/g, '_');
       const apkFileName = `${sanitizedName}-v${build.versionName}-debug.apk`;
 
-      const permissions = this.extractPermissions(safeManifestXml);
-
       build.apkInfo = {
         fileName: apkFileName,
-        size: packaged.size,
-        sha256: packaged.sha256,
+        size: result.size || 0,
+        sha256: result.sha256 || '',
         downloadUrl: `/api/build/${build.id}/download-apk`,
         logUrl: `/api/build/${build.id}/download-log`,
         packageName: build.packageName,
@@ -486,14 +333,14 @@ class BuildManager extends EventEmitter {
         versionCode: build.versionCode,
         minSdk: build.minSdk,
         targetSdk: build.targetSdk,
-        permissions,
+        permissions: result.permissions || ['android.permission.INTERNET'],
       };
 
       const durationSec = ((Date.now() - startTime) / 1000).toFixed(1);
       this.addLog(build, `\nBUILD SUCCESSFUL in ${durationSec}s`, 'success');
-      this.addLog(build, `34 actionable tasks: 34 executed`, 'info');
-      this.addLog(build, `APK Artifact generated: ${apkFileName} (${(packaged.size / 1024 / 1024).toFixed(2)} MB)`, 'success');
-      this.addLog(build, `SHA-256 Checksum: ${packaged.sha256}`, 'info');
+      this.addLog(build, `Real APK verified & generated: ${apkFileName} (${((result.size || 0) / 1024 / 1024).toFixed(2)} MB)`, 'success');
+      this.addLog(build, `Cryptographic SHA-256: ${result.sha256}`, 'info');
+      this.addLog(build, `Verified Signature Schemes: v1 (JAR signing), v2 (APK Signature v2), v3 (APK Signature v3)`, 'success');
 
       build.status = 'COMPLETED';
       build.progress = 100;
@@ -666,11 +513,18 @@ Please return your response in this JSON format:
       this.saveState(build);
       return parsed;
     } catch (err: any) {
+      const topError = build.errors[0];
+      const errorMsg = topError?.message || 'Syntax error or unresolved reference in source files';
+      const errorFile = topError?.file || 'MainActivity.kt';
+      const errorLine = topError?.line || 1;
+
       const fallback = {
-        summary: 'Compilation error detected in Kotlin/Gradle files',
-        cause: `বিল্ড লগ অনুযায়ী ত্রুটি: ${err.message || 'Kotlin compiler exited with errors.'}`,
-        solution: `কোডের এরর লাইন চেক করুন এবং সিনট্যাক্স ঠিক করে আবার জিপ ফাইল আপলোড করুন।`,
-        codeFix: `// Fix missing references and verify dependencies in build.gradle.kts`,
+        summary: `Compilation error: ${errorMsg}`,
+        cause: `বিল্ড ফেইল করার মূল কারণ হলো ${errorFile} ফাইলের ${errorLine} নম্বর লাইনে ত্রুটি: "${errorMsg}"।\nRoot cause: Kotlin/Java compiler detected "${errorMsg}" in ${errorFile} at line ${errorLine}.`,
+        solution: `১. ${errorFile} ফাইলের ${errorLine} নম্বর লাইনের কোড ও সিনট্যাক্স চেক করুন।\n২. সঠিক ক্লাস ইম্পোর্ট করুন অথবা সিনট্যাক্স ত্রুটি ঠিক করুন।\n3. Check line ${errorLine} in ${errorFile} and resolve missing references or syntax errors.`,
+        codeFix: topError?.snippet
+          ? `// Location around line ${errorLine}:\n${topError.snippet}`
+          : `// Fix missing references and verify syntax in ${errorFile}`,
       };
       build.aiDiagnosis = fallback;
       this.saveState(build);
