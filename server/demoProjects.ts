@@ -1,4 +1,6 @@
 import AdmZip from 'adm-zip';
+import fs from 'fs';
+import path from 'path';
 
 export interface DemoProjectDef {
   id: string;
@@ -7,137 +9,54 @@ export interface DemoProjectDef {
   packageName: string;
   versionName: string;
   versionCode: number;
+  category: 'game' | 'app' | 'starter' | 'test';
+  tags: string[];
   hasIntentionalError?: boolean;
   errorMessage?: string;
-  files: { path: string; content: string }[];
+  files?: { path: string; content: string }[];
 }
 
 export const DEMO_PROJECTS: Record<string, DemoProjectDef> = {
   mazebd: {
     id: 'mazebd',
-    name: 'MazeBDCreator',
-    description: 'Android Studio Kotlin DSL project (as shown in ZArchiver screenshot)',
+    name: 'MazeBD Creator',
+    description: 'Complete Android Studio puzzle game with Kotlin DSL, custom layouts, audio sound effects, and interactive levels.',
     packageName: 'com.mazebd.creator',
     versionName: '1.0.0',
     versionCode: 1,
+    category: 'game',
+    tags: ['Kotlin', 'Jetpack', 'Game Engine', 'Gradle 8.5'],
+  },
+  game_launcher: {
+    id: 'game_launcher',
+    name: 'Jairo Game Launcher Hub',
+    description: 'Production Android TV and Mobile game hub with vector icons, media services, foreground services, and Material design.',
+    packageName: 'com.android.gamelauncher',
+    versionName: '2.1.0',
+    versionCode: 21,
+    category: 'app',
+    tags: ['Android TV', 'Foreground Service', 'Material UI', 'Full Assets'],
+  },
+  compose_starter: {
+    id: 'compose_starter',
+    name: 'Jetpack Material 3 Starter',
+    description: 'Lightweight modern Android application template with Android 14 target, Material 3 theming, and edge-to-edge UI.',
+    packageName: 'com.cloudapk.materialstarter',
+    versionName: '1.0.0',
+    versionCode: 1,
+    category: 'starter',
+    tags: ['Material 3', 'Android 14', 'Edge-to-Edge'],
     files: [
-      {
-        path: 'build.gradle.kts',
-        content: `// Top-level build file where you can add configuration options common to all sub-projects/modules.
-plugins {
-    alias(libs.plugins.android.application) apply false
-    alias(libs.plugins.kotlin.android) apply false
-}
-`,
-      },
-      {
-        path: 'settings.gradle.kts',
-        content: `pluginManagement {
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-rootProject.name = "MazeBDCreator"
-include(":app")
-`,
-      },
-      {
-        path: 'gradle.properties',
-        content: `org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-android.useAndroidX=true
-android.enableJetifier=true
-kotlin.code.style=official
-`,
-      },
-      {
-        path: 'gradlew',
-        content: `#!/bin/sh
-exec java -version
-`,
-      },
-      {
-        path: 'README.md',
-        content: `# MazeBDCreator
-An Android application for creating and solving maze puzzles.
-Built with Android Studio, Kotlin, and Jetpack.
-`,
-      },
-      {
-        path: 'app/build.gradle.kts',
-        content: `plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
-}
-
-android {
-    namespace = "com.mazebd.creator"
-    compileSdk = 34
-
-    defaultConfig {
-        applicationId = "com.mazebd.creator"
-        minSdk = 24
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
-    kotlinOptions {
-        jvmTarget = "1.8"
-    }
-}
-
-dependencies {
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("com.google.android.material:material:1.11.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-}
-`,
-      },
       {
         path: 'app/src/main/AndroidManifest.xml',
         content: `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.mazebd.creator">
-
+    package="com.cloudapk.materialstarter">
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.VIBRATE" />
-
     <application
         android:allowBackup="true"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
-        android:icon="@mipmap/ic_launcher"
-        android:label="MazeBD Creator"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.MazeBDCreator">
+        android:label="Material 3 Starter"
+        android:theme="@style/Theme.Material3.DayNight.NoActionBar">
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -147,47 +66,21 @@ dependencies {
             </intent-filter>
         </activity>
     </application>
-
-</manifest>
-`,
+</manifest>`,
       },
       {
-        path: 'app/src/main/java/com/mazebd/creator/MainActivity.kt',
-        content: `package com.mazebd.creator
+        path: 'app/src/main/java/com/cloudapk/materialstarter/MainActivity.java',
+        content: `package com.cloudapk.materialstarter;
+import android.app.Activity;
+import android.os.Bundle;
 
-import android.os.Bundle
-import android.widget.Button
-import android.widget.TextView
-import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
-
-class MainActivity : AppCompatActivity() {
-    private var mazeLevel = 1
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        val titleView = findViewById<TextView>(R.id.titleView)
-        val levelButton = findViewById<Button>(R.id.btnNextLevel)
-
-        titleView.text = "MazeBD Creator - Level $mazeLevel"
-        levelButton.setOnClickListener {
-            mazeLevel++
-            titleView.text = "MazeBD Creator - Level $mazeLevel"
-            Toast.makeText(this, "Generating Maze Level $mazeLevel...", Toast.LENGTH_SHORT).show()
-        }
+public class MainActivity extends Activity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
     }
-}
-`,
-      },
-      {
-        path: 'app/src/main/res/values/strings.xml',
-        content: `<resources>
-    <string name="app_name">MazeBD Creator</string>
-    <string name="next_level">Generate Next Maze</string>
-</resources>
-`,
+}`,
       },
       {
         path: 'app/src/main/res/layout/activity_main.xml',
@@ -195,79 +88,48 @@ class MainActivity : AppCompatActivity() {
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:gravity="center"
-    android:padding="24dp"
-    android:background="#0F172A">
-
+    android:orientation="vertical"
+    android:background="#0F172A"
+    android:padding="24dp">
     <TextView
-        android:id="@+id/titleView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="MazeBD Creator"
-        android:textColor="#FFFFFF"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="20dp" />
-
-    <Button
-        android:id="@+id/btnNextLevel"
+        android:text="Welcome to CloudAPK Studio"
+        android:textColor="#10B981"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+    <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/next_level"
-        android:backgroundTint="#10B981"
-        android:textColor="#FFFFFF" />
-</LinearLayout>
-`,
+        android:layout_marginTop="8dp"
+        android:text="Built and compiled in real time with OpenJDK and D8"
+        android:textColor="#94A3B8"
+        android:textSize="14sp" />
+</LinearLayout>`,
+      },
+      {
+        path: 'app/src/main/res/values/strings.xml',
+        content: `<resources>
+    <string name="app_name">Material 3 Starter</string>
+</resources>`,
       },
     ],
   },
   error_demo: {
     id: 'error_demo',
-    name: 'BrokenAppProject',
-    description: 'Android project with deliberate Kotlin syntax error & missing bracket to test error logging & AI diagnostics',
+    name: 'Syntax Error Diagnostic Test',
+    description: 'Android project containing deliberate Kotlin syntax errors to test the compiler error parser and Gemini AI Diagnosis.',
     packageName: 'com.example.brokenapp',
     versionName: '1.0.0-beta',
     versionCode: 1,
+    category: 'test',
+    tags: ['Diagnostics', 'AI Debugging', 'Syntax Parsing'],
     hasIntentionalError: true,
     errorMessage: `e: /tmp/cloudapk-builds/build-error-test/app/src/main/java/com/example/brokenapp/MainActivity.kt: (18, 24): Unresolved reference: NonExistentHelperClass
-e: /tmp/cloudapk-builds/build-error-test/app/src/main/java/com/example/brokenapp/MainActivity.kt: (22, 9): Expecting ')' before 'Toast'
+e: /tmp/cloudapk-builds/build-error-test/app/src/main/java/com/example/brokenapp/MainActivity.kt: (19, 21): Expecting ')' before end of block
 > Task :app:compileDebugKotlin FAILED`,
     files: [
-      {
-        path: 'build.gradle.kts',
-        content: `plugins {
-    alias(libs.plugins.android.application) apply false
-    alias(libs.plugins.kotlin.android) apply false
-}
-`,
-      },
-      {
-        path: 'settings.gradle.kts',
-        content: `rootProject.name = "BrokenAppProject"
-include(":app")
-`,
-      },
-      {
-        path: 'app/build.gradle.kts',
-        content: `plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-}
-
-android {
-    namespace = "com.example.brokenapp"
-    compileSdk = 34
-    defaultConfig {
-        applicationId = "com.example.brokenapp"
-        minSdk = 24
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0-beta"
-    }
-}
-`,
-      },
       {
         path: 'app/src/main/AndroidManifest.xml',
         content: `<?xml version="1.0" encoding="utf-8"?>
@@ -283,8 +145,7 @@ android {
             </intent-filter>
         </activity>
     </application>
-</manifest>
-`,
+</manifest>`,
       },
       {
         path: 'app/src/main/java/com/example/brokenapp/MainActivity.kt',
@@ -300,18 +161,31 @@ class MainActivity : AppCompatActivity() {
         val helper = NonExistentHelperClass()
         helper.doSomething(
     }
-}
-`,
+}`,
       },
     ],
   },
 };
 
 export function createDemoZip(demoId: string): Buffer {
+  if (demoId === 'mazebd') {
+    const realZipPath = path.resolve('public/assets/aistudio/MazeBDCreator_7210c0a4.zip');
+    if (fs.existsSync(realZipPath)) {
+      return fs.readFileSync(realZipPath);
+    }
+  } else if (demoId === 'game_launcher') {
+    const realZipPath = path.resolve('public/assets/aistudio/Game-Launcher-main_474fcc1f.zip');
+    if (fs.existsSync(realZipPath)) {
+      return fs.readFileSync(realZipPath);
+    }
+  }
+
   const demo = DEMO_PROJECTS[demoId] || DEMO_PROJECTS.mazebd;
   const zip = new AdmZip();
-  for (const f of demo.files) {
-    zip.addFile(f.path, Buffer.from(f.content, 'utf-8'));
+  if (demo.files) {
+    for (const f of demo.files) {
+      zip.addFile(f.path, Buffer.from(f.content, 'utf-8'));
+    }
   }
   return zip.toBuffer();
 }

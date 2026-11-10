@@ -61,5 +61,7 @@ export interface DemoProject {
   description: string;
   packageName: string;
   versionName: string;
+  category?: 'game' | 'app' | 'starter' | 'test';
+  tags?: string[];
   hasIntentionalError: boolean;
 }

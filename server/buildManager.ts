@@ -5,7 +5,7 @@ import AdmZip from 'adm-zip';
 import { GoogleGenAI } from '@google/genai';
 import { packageCompleteApk } from './apkPackager.js';
 import { compileRealAndroidProject } from './realCompiler.js';
-import { DEMO_PROJECTS } from './demoProjects.js';
+import { DEMO_PROJECTS, createDemoZip } from './demoProjects.js';
 
 export interface LogEntry {
   id: number;
@@ -224,26 +224,8 @@ class BuildManager extends EventEmitter {
   }
 
   public async startDemoBuild(demoId: string = 'mazebd'): Promise<string> {
-    if (demoId === 'mazebd') {
-      const realZipPath = path.resolve('public/assets/aistudio/MazeBDCreator_7210c0a4.zip');
-      if (fs.existsSync(realZipPath)) {
-        const buf = fs.readFileSync(realZipPath);
-        return this.startBuildFromZip(buf, 'MazeBDCreator.zip');
-      }
-    } else if (demoId === 'game_launcher') {
-      const realZipPath = path.resolve('public/assets/aistudio/Game-Launcher-main_474fcc1f.zip');
-      if (fs.existsSync(realZipPath)) {
-        const buf = fs.readFileSync(realZipPath);
-        return this.startBuildFromZip(buf, 'Game-Launcher-main.zip');
-      }
-    }
-
     const demo = DEMO_PROJECTS[demoId] || DEMO_PROJECTS.mazebd;
-    const zip = new AdmZip();
-    for (const f of demo.files) {
-      zip.addFile(f.path, Buffer.from(f.content, 'utf-8'));
-    }
-    const buf = zip.toBuffer();
+    const buf = createDemoZip(demoId);
     return this.startBuildFromZip(buf, `${demo.name}.zip`);
   }
 

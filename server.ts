@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { buildManager } from './server/buildManager.js';
 import { DEMO_PROJECTS } from './server/demoProjects.js';
+import { ensureToolchainReady } from './server/toolchain.js';
 
 dotenv.config();
 
@@ -41,7 +42,7 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'CloudAPK Studio' });
 });
 
-// List demo projects
+// List starter templates & demo projects
 app.get('/api/demos', (_req, res) => {
   const demos = Object.values(DEMO_PROJECTS).map((d) => ({
     id: d.id,
@@ -49,6 +50,8 @@ app.get('/api/demos', (_req, res) => {
     description: d.description,
     packageName: d.packageName,
     versionName: d.versionName,
+    category: d.category || 'starter',
+    tags: d.tags || [],
     hasIntentionalError: !!d.hasIntentionalError,
   }));
   res.json(demos);
@@ -168,6 +171,8 @@ app.post('/api/build/:id/ai-diagnose', async (req, res) => {
 
 // Mount Vite middleware for dev or serve static files in production
 async function startServer() {
+  ensureToolchainReady().catch((err) => console.error('[Toolchain Boot]', err));
+
   if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.resolve('dist')));
     app.get('*', (_req, res) => {

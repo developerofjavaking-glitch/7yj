@@ -90,7 +90,7 @@ export const ZipGuideModal: React.FC<ZipGuideModalProps> = ({ isOpen, onClose, o
             }}
             className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5"
           >
-            <span>স্যাম্পল MazeBDCreator দিয়ে টেস্ট করুন</span>
+            <span>Build MazeBD Creator Project</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
           <button
